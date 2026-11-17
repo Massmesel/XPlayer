@@ -1,0 +1,66 @@
+
+name: Build X Player APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Extract project folders
+        run: |
+          if unzip -Z1 app.zip | grep -q '^app/'; then
+            unzip -o app.zip -d .
+          else
+            mkdir -p app
+            unzip -o app.zip -d app
+          fi
+
+          if unzip -Z1 gradle.zip | grep -q '^gradle/'; then
+            unzip -o gradle.zip -d .
+          else
+            mkdir -p gradle
+            unzip -o gradle.zip -d gradle
+          fi
+
+          test -d app
+          test -f settings.gradle.kts
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Build APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: XPlayer-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
